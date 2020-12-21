@@ -203,17 +203,52 @@ struct block_device *disk_part_iter_next(struct disk_part_iter *piter)
 	disk_part_iter_exit(piter);
 
 	rcu_read_lock();
+<<<<<<< HEAD
 	xa_for_each_start(&piter->disk->part_tbl, idx, part, piter->idx) {
+=======
+	ptbl = rcu_dereference(piter->disk->part_tbl);
+
+	/* determine iteration parameters */
+	if (piter->flags & DISK_PITER_REVERSE) {
+		inc = -1;
+		if (piter->flags & (DISK_PITER_INCL_PART0 |
+				    DISK_PITER_INCL_EMPTY_PART0))
+			end = -1;
+		else
+			end = 0;
+	} else {
+		inc = 1;
+		end = ptbl->len;
+	}
+
+	/* iterate to the next partition */
+	for (; piter->idx != end; piter->idx += inc) {
+		struct block_device *part;
+
+		part = rcu_dereference(ptbl->part[piter->idx]);
+		if (!part)
+			continue;
+		piter->part = bdgrab(part);
+		if (!piter->part)
+			continue;
+>>>>>>> aebf5db91705... block: fix use-after-free in disk_part_iter_next
 		if (!bdev_nr_sectors(part) &&
 		    !(piter->flags & DISK_PITER_INCL_EMPTY) &&
 		    !(piter->flags & DISK_PITER_INCL_EMPTY_PART0 &&
-		      piter->idx == 0))
+		      piter->idx == 0)) {
+			bdput(piter->part);
+			piter->part = NULL;
 			continue;
+		}
 
+<<<<<<< HEAD
 		piter->part = bdgrab(part);
 		if (!piter->part)
 			continue;
 		piter->idx = idx + 1;
+=======
+		piter->idx += inc;
+>>>>>>> aebf5db91705... block: fix use-after-free in disk_part_iter_next
 		break;
 	}
 	rcu_read_unlock();
